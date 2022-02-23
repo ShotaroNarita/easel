@@ -1,3 +1,37 @@
+class Option<T>{
+    found: boolean
+    value!: T
+
+    constructor() {
+        this.found = false
+    }
+
+    register(value: T) {
+        this.found = true
+        this.value = value
+    }
+}
+
+class Result<T, E>{
+    succeed: boolean
+    value!: T
+    message!: E
+
+    constructor() {
+        this.succeed = false
+    }
+
+    register(value: T) {
+        this.succeed = true
+        this.value = value
+    }
+
+    failure(message: E) {
+        this.succeed = false
+        this.message = message
+    }
+}
+
 class Color {
     red: number
     green: number
@@ -15,9 +49,15 @@ class Color {
         return `rgba(${this.red}, ${this.green}, ${this.blue}, ${this.alpha})`
     }
 
-    public static Red = new Color(255,0,0);
-    public static Green = new Color(0,255,0);
-    public static Blue = new Color(0,0,255);
+    pale(): Color {
+        return new Color(this.red, this.green, this.blue, 0.1)
+    }
+
+    public static Red = new Color(255, 0, 0);
+    public static Green = new Color(0, 255, 0);
+    public static Blue = new Color(0, 0, 255);
+    public static Black = new Color(0, 0, 0);
+    public static White = new Color(255, 255, 255);
 
 }
 
@@ -42,10 +82,10 @@ class Point {
 }
 
 class Polygon {
-    private static idcounter: number = 0
+    // private static idcounter: number = 0
     kind: PolygonType = PolygonType.Polygon
     name: string = 'untitled'
-    id: number
+    // id: number
 
     vertices: Array<Point>
 
@@ -57,8 +97,8 @@ class Polygon {
         this.name = name
 
         this.vertices = new Array<Point>()
-        this.id = Polygon.idcounter
-        Polygon.idcounter += 1
+        // this.id = Polygon.idcounter
+        // Polygon.idcounter += 1
     }
 
     draw(context: CanvasRenderingContext2D) {
@@ -85,12 +125,12 @@ class Polygon {
     contain(p: Point) {
         let theta_sum = 0
 
-        const vert_tmp = this.vertices.slice()
-        vert_tmp.push(this.vertices[0])
+        const vert = this.vertices.slice()
+        vert.push(this.vertices[0])
 
-        for (let i = 0; i < vert_tmp.length - 1; i++) {
-            const p0 = vert_tmp[i]
-            const p1 = vert_tmp[i + 1]
+        for (let i = 0; i < vert.length - 1; i++) {
+            const p0 = vert[i]
+            const p1 = vert[i + 1]
 
             const v0 = new Point(p0.x - p.x, p0.y - p.y)
             const v1 = new Point(p1.x - p.x, p1.y - p.y)
@@ -100,6 +140,14 @@ class Polygon {
         }
 
         return Math.trunc(theta_sum) !== 0
+    }
+
+    locate(position: Point){
+        // let center = new Point(0,0)
+        // this.vertices.forEach(p => {center = new Point(center.x + p.x, center.y + p.y)})
+        // center = new Point(center.x / this.vertices.length, center.y / this.vertices.length)
+
+        // this.vertices = this.vertices.map(p => {return new Point(p.x - center.x + position.x, p.y - center.y + position.y)})
     }
 }
 
@@ -159,13 +207,19 @@ class Rectangle extends Polygon {
     }
 }
 
+type ShapeID = number
+
 class Easel {
     context!: CanvasRenderingContext2D
     canvas!: HTMLCanvasElement
-    shapes: Array<Polygon>
+
+    idcounter: number = 0
+    shapes: Map<ShapeID, Polygon>
+    order: Array<ShapeID>
 
     constructor() {
-        this.shapes = []
+        this.shapes = new Map()
+        this.order = []
     }
 
     init(canvas: HTMLCanvasElement) {
@@ -176,21 +230,46 @@ class Easel {
 
     draw() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-        for (let shape of this.shapes) {
-            shape.draw(this.context)
+
+        for (let id of this.order) {
+            this.shapes.get(id)?.draw(this.context)
         }
     }
 
-    pick(point: Point) {
-        for (let i = 0; i < this.shapes.length; i++)
-            this.shapes[i].strokeColor = new Color(0, 0, 0)
+    pick(point: Point): Option<number> {
+        const option = new Option<number>()
 
-        for (let i = this.shapes.length - 1; 0 <= i; i--) {
+        this.shapes.forEach((shape, id) => {
+            shape.strokeColor = Color.Black
+            this.shapes.set(id, shape)
+        })
 
-            if (this.shapes[i].contain(point)) {
-                this.shapes[i].strokeColor = new Color(255, 0, 0)
-                break
+        for (let id of this.order.slice().reverse()) {
+            if (this.shapes.has(id)) {
+                const shape = this.shapes.get(id) as Polygon
+                if (shape.contain(point)) {
+                    shape.strokeColor = Color.Red
+                    this.shapes.set(id, shape)
+                    option.register(id)
+                    break
+                }
             }
+        }
+
+        return option
+    }
+
+    register(shape: Polygon) {
+        this.shapes.set(this.idcounter, shape)
+        this.order.push(this.idcounter)
+        this.idcounter++
+    }
+
+    place(id: number, point: Point) {
+        if(this.shapes.has(id)){
+            const shape = this.shapes.get(id) as Polygon
+            shape.vertices = shape.vertices.map(p => new Point(p.x + point.x, p.y + point.y))
+            this.shapes.set(id, shape)
         }
     }
 }

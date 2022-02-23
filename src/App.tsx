@@ -33,11 +33,12 @@ class App extends React.Component {
     for (let circle of circles) {
       const e = new Ellipse(circle.x, circle.y, circle.radius)
       e.fillColor = circle.color
-      easel.shapes.push(e)
+      easel.register(e)
     }
+    
     const s1 = new Rectangle(100, 100, 300, 400)
     s1.fillColor = new Color(255, 0, 0, 0.3)
-    easel.shapes.push(s1)
+    easel.register(s1)
     //
 
     this.setState({ easel })
@@ -69,8 +70,10 @@ class App extends React.Component {
 
           <tbody>
             {
-              this.state.easel.shapes.map(shape => {
-                return <tr key={shape.id}><td>{shape.id}</td><td>{shape.kind}</td><td>{shape.name}</td></tr>
+              Array.from(this.state.easel.shapes.entries()).map(info => {
+                const id = info[0]
+                const shape = info[1]
+                return <tr key={id}><td>{id}</td><td>{shape.kind}</td><td>{shape.name}</td></tr>
               })
             }
           </tbody>
