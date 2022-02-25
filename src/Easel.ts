@@ -59,6 +59,8 @@ class Color {
     public static Black = new Color(0, 0, 0);
     public static White = new Color(255, 255, 255);
 
+
+
 }
 
 enum PolygonType {
@@ -79,6 +81,10 @@ class Point {
     length(): number {
         return Math.sqrt(this.x * this.x + this.y * this.y)
     }
+
+    toString(){
+        return `(${this.x}, ${this.y})`
+    }
 }
 
 class Polygon {
@@ -97,8 +103,6 @@ class Polygon {
         this.name = name
 
         this.vertices = new Array<Point>()
-        // this.id = Polygon.idcounter
-        // Polygon.idcounter += 1
     }
 
     draw(context: CanvasRenderingContext2D) {
@@ -142,12 +146,20 @@ class Polygon {
         return Math.trunc(theta_sum) !== 0
     }
 
-    locate(position: Point){
+    locate(position: Point) {
         // let center = new Point(0,0)
         // this.vertices.forEach(p => {center = new Point(center.x + p.x, center.y + p.y)})
         // center = new Point(center.x / this.vertices.length, center.y / this.vertices.length)
 
         // this.vertices = this.vertices.map(p => {return new Point(p.x - center.x + position.x, p.y - center.y + position.y)})
+    }
+
+    center(){
+        let c = new Point(0,0)
+        this.vertices.forEach(p => {c = new Point(c.x + p.x, c.y + p.y)})
+        c = new Point(c.x / this.vertices.length, c.y / this.vertices.length)
+        c = new Point(Math.floor(c.x), Math.floor(c.y))
+        return c
     }
 }
 
@@ -162,12 +174,13 @@ class Ellipse extends Polygon {
         this.y = y
         this.radius = radius
 
-        const N = 24
-        for (let i = 0; i < N; i++) {
-            const cx = radius * Math.cos(i / N * 2 * Math.PI) + x
-            const cy = radius * Math.sin(i / N * 2 * Math.PI) + y
-            this.vertices.push(new Point(cx, cy))
-        }
+        this.locate(new Point(x, y))
+        // const N = 24
+        // for (let i = 0; i < N; i++) {
+        //     const cx = radius * Math.cos(i / N * 2 * Math.PI) + x
+        //     const cy = radius * Math.sin(i / N * 2 * Math.PI) + y
+        //     this.vertices.push(new Point(cx, cy))
+        // }
     }
 
     //overwrite
@@ -183,6 +196,19 @@ class Ellipse extends Polygon {
         context.arc(this.x, this.y, this.radius, 0, Math.PI * 2)
         context.closePath()
         context.stroke()
+    }
+
+    locate(position: Point): void {
+        this.x = position.x
+        this.y = position.y
+        this.vertices = []
+
+        const N = 24
+        for (let i = 0; i < N; i++) {
+            const cx = this.radius * Math.cos(i / N * 2 * Math.PI) + this.x
+            const cy = this.radius * Math.sin(i / N * 2 * Math.PI) + this.y
+            this.vertices.push(new Point(cx, cy))
+        }
     }
 }
 
@@ -200,10 +226,19 @@ class Rectangle extends Polygon {
         this.width = width
         this.height = height
 
-        this.vertices.push(new Point(x, y))
-        this.vertices.push(new Point(x + width, y))
-        this.vertices.push(new Point(x + width, y + height))
-        this.vertices.push(new Point(x, y + height))
+        this.locate(new Point(x + width / 2, y + height / 2))
+    }
+
+    locate(position: Point): void {
+        this.x = position.x - this.width / 2
+        this.y = position.y - this.height / 2
+        // this.miomon = onaka.ippai
+
+        this.vertices = []
+        this.vertices.push(new Point(this.x, this.y))
+        this.vertices.push(new Point(this.x + this.width, this.y))
+        this.vertices.push(new Point(this.x + this.width, this.y + this.height))
+        this.vertices.push(new Point(this.x, this.y + this.height))
     }
 }
 
@@ -239,17 +274,10 @@ class Easel {
     pick(point: Point): Option<number> {
         const option = new Option<number>()
 
-        this.shapes.forEach((shape, id) => {
-            shape.strokeColor = Color.Black
-            this.shapes.set(id, shape)
-        })
-
         for (let id of this.order.slice().reverse()) {
             if (this.shapes.has(id)) {
                 const shape = this.shapes.get(id) as Polygon
                 if (shape.contain(point)) {
-                    shape.strokeColor = Color.Red
-                    this.shapes.set(id, shape)
                     option.register(id)
                     break
                 }
@@ -259,19 +287,36 @@ class Easel {
         return option
     }
 
-    register(shape: Polygon) {
+    register(shape: Polygon): ShapeID {
         this.shapes.set(this.idcounter, shape)
         this.order.push(this.idcounter)
         this.idcounter++
+        return this.idcounter - 1
+    }
+
+    unregister(id: ShapeID){
+        this.shapes.delete(id)
     }
 
     place(id: number, point: Point) {
-        if(this.shapes.has(id)){
-            const shape = this.shapes.get(id) as Polygon
-            shape.vertices = shape.vertices.map(p => new Point(p.x + point.x, p.y + point.y))
-            this.shapes.set(id, shape)
+        if (this.shapes.has(id)) {
+            const shapes = this.shapes.get(id) as Polygon
+            shapes.locate(point)
         }
+    }
+
+    focus(id: ShapeID, color = Color.Red) {
+        const shape = this.shapes.get(id) as Polygon
+        shape.strokeColor = color
+        this.shapes.set(id, shape)
+    }
+
+    blur() {
+        this.shapes.forEach((shape, id) => {
+            shape.strokeColor = Color.Black
+            this.shapes.set(id, shape)
+        })
     }
 }
 
-export { Easel, Color, Rectangle, Ellipse, Point }
+export { Easel, Color, Rectangle, Ellipse, Point, Polygon }
